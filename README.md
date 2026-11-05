@@ -32,7 +32,6 @@ smart_diet/
 │     ├─ knowledge_source/     # 原始知识文档
 │     └─ vector_db/            # 本地生成的向量索引，不提交 Git
 ├─ dataset/                    # MiniCPM 微调数据清单
-├─ database/                   # 原训练项目保留的数据库文件
 ├─ tests/                      # 自动化测试（待补充）
 ├─ build_dataset.py            # 微调数据集构建脚本
 ├─ test_api.py                 # 双模型识别流程原始验证脚本

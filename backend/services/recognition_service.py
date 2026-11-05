@@ -11,8 +11,6 @@
 """
 from ai.llm_client import get_llm
 from ai.finetune_client import get_finetune_client
-# 百度AI菜品识别客户端（代码保留，需要切回百度时恢复 import 并改调用方式）：
-# from ai.vision_client import get_vision_client
 from dao.food_dao import FoodDAO
 from dao.correction_dao import CorrectionDAO
 
@@ -36,7 +34,6 @@ class RecognitionService:
         }
         """
         # 1. 调用本地识别服务识别菜名（微调API识别 + 基座模型裁决验证）
-        #    原百度调用：client = get_vision_client(); raw_candidates = client.recognize_dish(image_bytes, top_num=5)
         import requests
         try:
             client = get_finetune_client()

@@ -36,9 +36,7 @@ DEEPSEEK_BASE_URL = os.getenv(
 )
 LLM_MODEL = os.getenv("LLM_MODEL", "deepseek-chat")
 
-# Legacy clients are kept for now but disabled unless explicitly configured.
-BAIDU_API_KEY = os.getenv("BAIDU_API_KEY", "")
-BAIDU_SECRET_KEY = os.getenv("BAIDU_SECRET_KEY", "")
+# Legacy RAG still uses Ollama until the LangChain pipeline replaces it.
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
 
 

@@ -39,16 +39,11 @@ inline const double kKcalPerGramFat     = 9.0;
 inline const double kKcalPerGramCarb    = 4.0;
 
 // ------------------------------------------------------------
-// AI 服务接入说明（尚未实现，占位）
+// AI 服务接入说明
 // ------------------------------------------------------------
-// 1) 菜品识别：百度智能云「菜品识别」接口（免费 500 次/天）
-//    - 注册百度智能云账号，创建应用获取 API Key / Secret Key
-//    - 通过 OAuth 获取 access_token，调用 dish 识别接口
-//    - 返回菜名 + 置信度，由 RecognitionService 解析（见 services/RecognitionService.cpp 中 TODO）
-// 2) 对话大模型：DeepSeek 开放平台
-//    - 注册获取 API Key，调用 chat/completions 接口（流式）
-//    - 结合结构化 RAG：先从 MySQL 检索健康档案/历史饮食记录/食物知识，拼接 prompt 后生成回答
-// 3) 数据存储：MySQL 8.x，10 张表（见 sql/schema.sql），通过 DAO + 连接池访问
+// 1) 菜品识别：MiniCPM-V 微调模型识别 + 基座模型二次校验
+// 2) 对话生成：云端 OpenAI 兼容 API，结合营养知识 RAG 与用户数据
+// 3) 数据存储：MySQL，参见 backend/database/schema.sql
 
 } // namespace AppConfig
 
