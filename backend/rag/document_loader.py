@@ -28,17 +28,19 @@ REQUIRED_METADATA = {
     "license",
 }
 
+# define capture info from source data
 FRONT_MATTER_PATTERN = re.compile(
     r"\A---\s*\r?\n(?P<metadata>.*?)\r?\n---\s*(?:\r?\n|\Z)(?P<body>.*)\Z",
     re.DOTALL,
-)
+)# DOTALL .能包含换行符 读取多行内容
 IMAGE_PATTERN = re.compile(r"!\[[^\]]*\]\([^)]*\)|<img\b[^>]*>", re.IGNORECASE)
 UNRELIABLE_LINE_PATTERN = re.compile(r"^预估(?:烹饪)?(?:难度|卡路里)[：:].*$")
 CONTRIBUTION_PATTERN = re.compile(
     r"如果您遵循本指南.*(?:Issue|Pull\s*request)", re.IGNORECASE
 )
+# IGNORECASE 忽略大小写
 
-
+# 异常类 值异常时报错为RecipeDocumentError
 class RecipeDocumentError(ValueError):
     """Raised when a curated recipe file does not match the expected format."""
 
@@ -63,19 +65,19 @@ def _parse_markdown(path: Path) -> tuple[dict[str, Any], str]:
 
 def _clean_recipe_body(body: str) -> str:
     """Keep recipe facts while removing unverified preamble and boilerplate."""
-    body = body.replace("\r\n", "\n").replace("\r", "\n")
-    lines = body.splitlines()
+    body = body.replace("\r\n", "\n").replace("\r", "\n") # 统一换行符
+    lines = body.splitlines()  # 按行切分文本 输出一个列表 一行作为一个元素
 
     cleaned: list[str] = []
     seen_title = False
     reached_first_section = False
 
     for line in lines:
-        stripped = line.strip()
+        stripped = line.strip()   # strip() 去掉字符串两边空白
 
         if stripped.startswith("# ") and not seen_title:
             seen_title = True
-            cleaned.append(line.rstrip())
+            cleaned.append(line.rstrip())  # rstrip去掉右边空白 防止删去缩进
             continue
 
         if seen_title and not reached_first_section:
@@ -119,13 +121,14 @@ def _build_metadata(raw: dict[str, Any], path: Path, root: Path) -> dict[str, An
         )
 
     # Chroma metadata values should be scalar, so normalize every value here.
+    # scaler标量 数据库内只能是标量 不能是列表或字典等
     metadata = {key: str(value) for key, value in raw.items()}
     metadata.update(
         {
             "source": str(raw["source_url"]),
-            "local_path": path.relative_to(root).as_posix(),
+            "local_path": path.relative_to(root).as_posix(),   # path.relative_to()求对于参数的相对路径；as_posix强制使用正斜杠/
             "document_type": "recipe",
-        }
+        }  # update() 更新字典的内容的函数
     )
     return metadata
 
