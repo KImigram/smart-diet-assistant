@@ -4,6 +4,22 @@ from database.connection import execute_query, execute_update
 
 class ChatDAO:
     @staticmethod
+    def get_owned_session(session_id: int, user_id: int):
+        rows = execute_query(
+            "SELECT id FROM chat_sessions WHERE id = %s AND user_id = %s",
+            (session_id, user_id),
+        )
+        return rows[0] if rows else None
+
+    @staticmethod
+    def recent_session_messages(session_id: int, limit: int = 12):
+        rows = execute_query(
+            "SELECT role, content FROM chat_messages WHERE session_id = %s ORDER BY id DESC LIMIT %s",
+            (session_id, limit),
+        )
+        return list(reversed(rows))
+
+    @staticmethod
     def create_session(user_id: int, title: str = "新对话"):
         return execute_update(
             "INSERT INTO chat_sessions (user_id, title) VALUES (%s, %s)",

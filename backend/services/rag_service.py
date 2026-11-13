@@ -64,17 +64,17 @@ class RAGService:
             context["recent_meals"] = RAGService._retrieve_recent_meals(user_id)
 
         # 3. 食物知识（问题中提到具体食物时）
-        if "food_knowledge" in intents:
+        if "food_knowledge" in intents or "nutrition" in intents:
             context["food_knowledge"] = RAGService._retrieve_food_knowledge(question)
 
         # 4. 体重趋势
         if "weight" in intents:
             context["weight"] = RAGService._retrieve_weight(user_id)
 
-        # 5. 菜谱/烹饪知识（向量语义检索营养知识库，借鉴混合检索思路）
-        if "recipe" in intents:
-            from services.vector_retrieval import VectorRetrieval
-            context["recipe"] = VectorRetrieval.query(question, top_k=3)
+        # Every question can retrieve recipes; keyword routing previously missed
+        # questions such as "宫保鸡丁需要哪些食材". Distance filtering is configurable.
+        from rag.runtime import recipe_context
+        context["recipe"] = recipe_context(question)
 
         return context
 
@@ -85,28 +85,11 @@ class RAGService:
         构建发送给大模型的完整消息列表。
         格式：[system, context(用户), history..., current_question]
         """
-        from ai.llm_client import SYSTEM_PROMPT
-
-        # 检索上下文
-        context = RAGService.retrieve(user_id, question)
-        context_text = RAGService._format_context(context)
-
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "system", "content": f"【用户数据上下文】\n{context_text}"},
-        ]
-
-        # 历史对话（最近 6 轮，控制上下文窗口）
-        if history_messages:
-            for msg in history_messages[-12:]:  # 6轮 = 12条消息
-                messages.append({
-                    "role": msg["role"],
-                    "content": msg["content"],
-                })
-
-        # 当前问题
-        messages.append({"role": "user", "content": question})
-        return messages
+        from langchain_core.messages import convert_to_openai_messages
+        from rag.context_builder import build_messages
+        return convert_to_openai_messages(build_messages(
+            RAGService.retrieve(user_id, question), question, history_messages
+        ))
 
     # ---- 各数据源检索 ----
 
@@ -116,10 +99,10 @@ class RAGService:
         if not profile:
             return {}
         # 计算 BMI
-        height = float(profile.get("height_cm", 170))
+        height = float(profile["height_cm"]) if profile.get("height_cm") else None
         weight_rec = UserDAO.latest_weight(user_id)
-        weight = float(weight_rec["weight_kg"]) if weight_rec else 65.0
-        bmi = round(weight / ((height / 100) ** 2), 1) if height > 0 else 0
+        weight = float(weight_rec["weight_kg"]) if weight_rec else None
+        bmi = round(weight / ((height / 100) ** 2), 1) if height and height > 0 and weight else None
         return {
             "nickname": profile.get("nickname", ""),
             "gender": profile.get("gender", ""),
@@ -233,9 +216,8 @@ class RAGService:
         if "recipe" in context and context["recipe"]:
             lines.append("\n菜谱知识库检索（来源：HowToCook 开源菜谱库）：")
             for r in context["recipe"]:
-                cal = f"，预估热量{r['calorie']}大卡" if r.get("calorie") else ""
-                diff = f"，难度{r['difficulty']}" if r.get("difficulty") and r["difficulty"] != "未知" else ""
-                lines.append(f"  ① {r['dish_name']}（{r['category']}{diff}{cal}）")
-                lines.append(f"     {str(r['content'])[:260]}")
+                lines.append(f"[{r['citation']}] {r['title']} / {r['section']}")
+                lines.append(r['content'])
+                lines.append(f"来源：{r['source']}；余弦距离：{r['distance']:.4f}")
 
         return "\n".join(lines) if lines else "（暂无用户数据）"
