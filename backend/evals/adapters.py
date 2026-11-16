@@ -38,3 +38,23 @@ class DenseAdapter:
 
 def create_dense(options: dict):
     return DenseAdapter(options)
+
+
+class RewriteDenseAdapter(DenseAdapter):
+    def __init__(self, options: dict):
+        from rag.query_rewriter import create_rewrite_model
+        self.rewrite_model = create_rewrite_model()
+        super().__init__(options)
+        from config import LLM_MODEL
+        self.info.update(name="rewrite+dense-bge-m3", rewrite_model=LLM_MODEL,
+                         rewrite_temperature=0, rewrite_history_messages=12,
+                         rewrite_history_character_budget=8000)
+
+    def retrieve(self, question: str, history: list[dict], k: int) -> list[dict]:
+        from rag.query_rewriter import rewrite_question
+        self.last_rewrite = rewrite_question(question, history, self.rewrite_model)
+        return super().retrieve(self.last_rewrite['query'], [], k)
+
+
+def create_rewrite_dense(options: dict):
+    return RewriteDenseAdapter(options)

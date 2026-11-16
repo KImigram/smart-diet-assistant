@@ -52,7 +52,8 @@ def main():
         parser.error("options 必须是 JSON 对象")
     if args.max_distance is not None:
         if args.adapter != "evals.adapters:create_dense":
-            parser.error("--max-distance 仅适用于默认稠密检索；其他适配器请通过 options 配置")
+            if args.adapter != "evals.adapters:create_rewrite_dense":
+                parser.error("--max-distance 仅适用于稠密或改写加稠密检索；其他适配器请通过 options 配置")
         if not 0 <= args.max_distance <= 2:
             parser.error("余弦距离阈值必须在 0 到 2 之间")
         options["max_distance"] = args.max_distance
@@ -71,9 +72,11 @@ def main():
     if output.exists():
         parser.error("输出目录已存在，请指定新目录，避免覆盖报告")
     module, factory = args.adapter.split(":", 1)
+    print("正在初始化检索器、加载本地模型并打开索引，请等待……", flush=True)
     start = time.perf_counter()
     adapter = getattr(importlib.import_module(module), factory)(options)
     startup_ms = (time.perf_counter() - start) * 1000
+    print(f"检索器初始化完成，耗时 {startup_ms/1000:.1f} 秒", flush=True)
     # Persisted dense index must exactly match current chunks before scoring.
     if hasattr(adapter, "store"):
         saved = adapter.store.get(include=["documents", "metadatas"])
@@ -113,6 +116,8 @@ def main():
                "raw_metrics": rank_metrics(hits, labels[case["id"]], ks),
                "accepted_metrics": rank_metrics(accepted, labels[case["id"]], ks),
                "elapsed_ms": elapsed_ms, "error": error}
+        row['rewrite'] = getattr(adapter, 'last_rewrite', None)
+        row['retrieval_question'] = row['rewrite']['query'] if row['rewrite'] else question
         rows.append(row)
         print(f"[{i}/{len(selected)}] {case['id']} {'ERROR' if error else 'OK'} {elapsed_ms:.0f}ms", flush=True)
     summary = aggregate(rows, ks)
@@ -134,6 +139,11 @@ def main():
               "remaining_queries_p50_ms": percentile([r['elapsed_ms'] for r in rows[1:] if not r['error']], .5),
               "remaining_queries_p95_ms": percentile([r['elapsed_ms'] for r in rows[1:] if not r['error']], .95),
               "summary": summary, "by_category": groups, "rows": rows}
+    report['rewrite_summary'] = {
+        'attempted':sum(bool(r['rewrite']) and r['rewrite']['status'] != 'no_history' for r in rows),
+        'changed':sum(bool(r['rewrite']) and r['rewrite']['changed'] for r in rows),
+        'fallbacks':sum(bool(r['rewrite']) and r['rewrite']['status'] == 'fallback' for r in rows),
+    }
     output.mkdir(parents=True)
     (output / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     lines = ["# Retrieval evaluation / 检索评测", "", f"split={args.split}, mode={args.mode}",
@@ -143,6 +153,15 @@ def main():
     lines += ["", f"无答案题拒绝率：{summary['negative_rejection_rate']}",
               f"有答案题空结果率：{summary['positive_empty_rate']}", f"错误数：{summary['errors']}",
               "", "拒绝率只评价检索过滤，不代表生成模型已正确拒答。逐题原文、分数和错误见 report.json。"]
+    if report['rewrite_summary']['attempted']:
+        lines += ["", "## 查询改写", "", str(report['rewrite_summary']), "",
+                  "| 题号 | 原问题 | 检索问题 | 状态 | 改写耗时 ms |", "|---|---|---|---|---|"]
+        for row in rows:
+            trace = row['rewrite']
+            if trace and trace['status'] != 'no_history':
+                original = row['question'].replace('|','／').replace('\n',' ')
+                query = trace['query'].replace('|','／').replace('\n',' ')
+                lines.append(f"| {row['id']} | {original} | {query} | {trace['status']} | {trace['elapsed_ms']:.0f} |")
     (output / "summary.md").write_text("\n".join(lines), encoding="utf-8")
     print(f"报告：{output.resolve()}")
     if summary['errors']:
