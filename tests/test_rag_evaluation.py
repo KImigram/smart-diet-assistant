@@ -12,6 +12,7 @@ sys.path.insert(0, str(PROJECT / 'backend'))
 from evals.benchmark import aggregate, compile_labels, load_cases, rank_metrics
 from evals.compare_runs import compare
 from evals import evaluate_retrieval as runner
+from evals.sweep_thresholds import sweep
 from rag.document_loader import load_recipe_documents
 from rag.chunker import split_recipe_documents
 
@@ -105,6 +106,11 @@ def test_runner_writes_complete_report_without_model(tmp_path, monkeypatch):
     assert report['summary']['questions'] == len(report['rows'])
     assert (out/'summary.md').exists()
     assert report['summary']['negative_rejection_rate'] == 0
+    report['adapter_info']['score_type'] = 'cosine_distance_lower_is_better'
+    results = sweep(report, [.1, .3], 3)
+    assert len(results[1]['positive_empty_ids']) == report['summary']['answerable']
+    assert results[1]['summary']['negative_rejection_rate'] == 1
+    assert results[2]['summary']['negative_rejection_rate'] == 0
     assert 'delta=+0.0000' in compare(report, copy.deepcopy(report))
     changed = copy.deepcopy(report)
     changed['dataset_hash'] = 'different'
