@@ -44,17 +44,22 @@ def compile_labels(cases: list[dict], chunks: list) -> dict:
     for case in cases:
         groups = []
         for evidence in case["evidence"]:
-            quote = normalize(evidence["quote"])
-            if not quote:
-                raise ValueError(f"{case['id']}: empty evidence quote")
-            matches = {
-                chunk.metadata["chunk_id"] for chunk in chunks
-                if chunk.metadata["local_path"] == evidence["source"]
-                and chunk.metadata["section"] == evidence["section"]
-                and quote in normalize(chunk.page_content)
-            }
-            if not matches:
-                raise ValueError(f"{case['id']}: 原文证据无法匹配当前分块：{evidence}")
+            matches = set()
+            # OR alternatives are equivalent ways of supporting ONE fact;
+            # separate evidence entries still represent distinct required facts.
+            for locator in [evidence, *evidence.get("alternatives", [])]:
+                quote = normalize(locator["quote"])
+                if not quote:
+                    raise ValueError(f"{case['id']}: empty evidence quote")
+                found = {
+                    chunk.metadata["chunk_id"] for chunk in chunks
+                    if chunk.metadata["local_path"] == evidence["source"]
+                    and chunk.metadata["section"] == locator["section"]
+                    and quote in normalize(chunk.page_content)
+                }
+                if not found:
+                    raise ValueError(f"{case['id']}: 原文证据无法匹配当前分块：{locator}")
+                matches.update(found)
             groups.append(matches)
         labels[case["id"]] = {
             "groups": groups,

@@ -50,6 +50,34 @@ def test_missing_evidence_is_not_silently_skipped():
         compile_labels([case], [])
 
 
+def test_equivalent_evidence_forms_one_required_group():
+    from langchain_core.documents import Document
+    chunks = [Document(page_content='蒜蓉酱',metadata={'local_path':'a','section':s,'chunk_id':s})
+              for s in ['原料','计算']]
+    case = {'id':'x','evidence':[{'source':'a','section':'原料','quote':'蒜蓉酱',
+                                'alternatives':[{'section':'计算','quote':'蒜蓉酱'}]}]}
+    label = compile_labels([case], chunks)['x']
+    assert len(label['groups']) == 1
+    assert label['relevant'] == {'原料','计算'}
+    metrics = rank_metrics([{'chunk_id':'计算','source':'a'}], label, [1])['1']
+    assert metrics['evidence_group_coverage'] == 1
+    assert metrics['evidence_recall'] == .5
+
+
+def test_v2_changes_only_dev_evidence():
+    original = load_cases(PROJECT/'backend/evals/rag_questions.jsonl')
+    revised = load_cases(PROJECT/'backend/evals/rag_questions_v2.jsonl')
+    changed = []
+    for left, right in zip(original, revised):
+        if left != right:
+            changed.append(left['id'])
+            assert left['split'] == 'dev'
+            assert {k:v for k,v in left.items() if k != 'evidence'} == {k:v for k,v in right.items() if k != 'evidence'}
+            assert left['evidence'] == [{k:v for k,v in e.items() if k != 'alternatives'} for e in right['evidence']]
+    assert len(changed) == 11
+    compile_labels(revised, split_recipe_documents(load_recipe_documents()))
+
+
 def test_errors_are_not_counted_as_successful_negative_rejections():
     rows = [{'answerable':False,'error':'boom','accepted':[]},
             {'answerable':False,'error':None,'accepted':[]}]

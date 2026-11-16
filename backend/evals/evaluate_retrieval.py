@@ -31,7 +31,7 @@ def percentile(values, quantile):
 
 def main():
     parser = argparse.ArgumentParser(description="固定菜谱检索评测；正式运行会加载本地模型")
-    parser.add_argument("--questions", type=Path, default=Path(__file__).with_name("rag_questions.jsonl"))
+    parser.add_argument("--questions", type=Path, default=Path(__file__).with_name("rag_questions_v2.jsonl"))
     parser.add_argument("--validate-only", action="store_true", help="只校验题库证据，不加载模型")
     parser.add_argument("--split", choices=["dev", "test", "all"], default="dev")
     parser.add_argument("--mode", choices=["raw", "oracle"], default="raw",

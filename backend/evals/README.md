@@ -1,5 +1,7 @@
 # 固定菜谱检索测评 v1
 
+更新：默认题库现为 `rag_questions_v2.jsonl`，只修正开发集等价证据，详见 [ANNOTATION_V2.md](ANNOTATION_V2.md)。原 `rag_questions.jsonl` 保留，复现旧标注可用 `--questions` 指定。
+
 目标：为当前 BGE-M3 稠密检索建立可复用基线，未来在同一题库和语料上比较 BM25、混合检索、重排序和问题改写。
 本系统只评价菜谱检索，不调用云端模型、不评价最终回答质量，也不修改现有索引。
 
