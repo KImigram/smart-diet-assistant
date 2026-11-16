@@ -218,6 +218,10 @@ class RAGService:
             for r in context["recipe"]:
                 lines.append(f"[{r['citation']}] {r['title']} / {r['section']}")
                 lines.append(r['content'])
-                lines.append(f"来源：{r['source']}；余弦距离：{r['distance']:.4f}")
+                if r.get('distance') is not None:
+                    score_text = f"余弦距离：{r['distance']:.4f}"
+                else:
+                    score_text = f"{r.get('retrieval_mode', 'retrieval')} 分数：{r.get('retrieval_score', 0):.4f}"
+                lines.append(f"来源：{r['source']}；{score_text}")
 
         return "\n".join(lines) if lines else "（暂无用户数据）"
