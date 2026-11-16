@@ -1,4 +1,4 @@
-"""Run frozen retrieval questions without any cloud generation or LLM judge."""
+"""Evaluate retrieval; rewrite adapters optionally call cloud query rewriting."""
 
 import argparse
 import importlib
@@ -50,6 +50,9 @@ def main():
     options = json.loads(args.options)
     if not isinstance(options, dict):
         parser.error("options 必须是 JSON 对象")
+    if args.adapter in {'evals.adapters:create_bm25', 'evals.adapters:create_rewrite_bm25'}:
+        # Lexical-only adapters build from source and must use the evaluated chunking.
+        options.update(size=args.size, overlap=args.overlap)
     if args.max_distance is not None:
         if args.adapter != "evals.adapters:create_dense":
             if args.adapter != "evals.adapters:create_rewrite_dense":
@@ -134,7 +137,7 @@ def main():
               "case_ids": [c["id"] for c in selected], "split": args.split, "mode": args.mode, "ks": ks,
               "adapter": args.adapter, "adapter_info": getattr(adapter, "info", {}), "options": options,
               "git_revision": git_revision, "code_hash": digest({str(p.relative_to(Path(__file__).resolve().parents[2])):p.read_text(encoding='utf-8') for p in tracked_code}),
-              "python": platform.python_version(), "packages": {p: version(p) for p in ['torch','sentence-transformers','langchain-core','langchain-chroma','chromadb']},
+              "python": platform.python_version(), "packages": {p: version(p) for p in ['torch','sentence-transformers','langchain-core','langchain-chroma','chromadb','rank-bm25','jieba']},
               "startup_ms": startup_ms, "first_query_ms": rows[0]["elapsed_ms"],
               "remaining_queries_p50_ms": percentile([r['elapsed_ms'] for r in rows[1:] if not r['error']], .5),
               "remaining_queries_p95_ms": percentile([r['elapsed_ms'] for r in rows[1:] if not r['error']], .95),
