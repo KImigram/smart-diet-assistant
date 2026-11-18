@@ -61,7 +61,17 @@ class RAGService:
 
         # 2. 最近饮食记录
         if "recent_meals" in intents:
-            context["recent_meals"] = RAGService._retrieve_recent_meals(user_id)
+            from services.structured_nutrition import meal_context
+            context['nutrition_request'] = meal_context(user_id, question)
+            context['recent_meals'] = context['nutrition_request']['records']
+            request = context['nutrition_request']
+            if request['status'] == 'ok' and request['start_date'] == request['end_date'] and not request['meal_types']:
+                target = context.get('profile', {}).get('target_calorie')
+                calorie = request['totals']['calorie']
+                if target is not None and calorie is not None:
+                    request['calorie_balance'] = {'target':float(target),
+                        'remaining':round(max(0, float(target)-float(calorie)),1),
+                        'excess':round(max(0, float(calorie)-float(target)),1)}
 
         # 3. 食物知识（问题中提到具体食物时）
         if "food_knowledge" in intents or "nutrition" in intents:
@@ -71,10 +81,15 @@ class RAGService:
         if "weight" in intents:
             context["weight"] = RAGService._retrieve_weight(user_id)
 
-        # Every question can retrieve recipes; keyword routing previously missed
-        # questions such as "宫保鸡丁需要哪些食材". Distance filtering is configurable.
-        from rag.runtime import recipe_context
-        context["recipe"] = recipe_context(question)
+        structured_question = any(word in question for word in [
+            '今天','昨天','登记','记录','档案','体重','热量','蛋白','脂肪','碳水','纤维','卡路里','营养','维生素'])
+        recipe_question = 'recipe' in intents or any(word in question for word in [
+            '怎么','如何','为什么','食材','原料','工具','隔夜','配方','过敏','忌口','能吃'])
+        if structured_question and not recipe_question:
+            context['recipe'] = []
+        else:
+            from rag.runtime import recipe_context
+            context['recipe'] = recipe_context(question)
 
         return context
 
@@ -140,18 +155,8 @@ class RAGService:
     @staticmethod
     def _retrieve_food_knowledge(question: str) -> list[dict]:
         """从问题中提取食物名，检索营养知识"""
-        results = []
-        # 简单关键词匹配：搜索问题中出现的食物
-        all_foods = FoodDAO.search("", limit=100)
-        for food in all_foods:
-            if food["name"] in question:
-                nutrition = FoodDAO.get_nutrition(food["id"])
-                results.append({
-                    "name": food["name"],
-                    "category": food["category"],
-                    "nutrition_per_100g": nutrition,
-                })
-        return results[:5]
+        from services.structured_nutrition import food_knowledge
+        return food_knowledge(question)
 
     @staticmethod
     def _retrieve_weight(user_id: int, days: int = 30) -> dict:
@@ -191,9 +196,10 @@ class RAGService:
                     f"{m['portion_g']}g → {m['calorie']}kcal，蛋白{m['protein']}g"
                 )
             # 汇总
-            total_cal = sum(m["calorie"] for m in context["recent_meals"])
-            total_pro = sum(m["protein"] for m in context["recent_meals"])
-            lines.append(f"  汇总：热量{round(total_cal)}kcal，蛋白{round(total_pro, 1)}g")
+            meals = context['recent_meals']
+            total_cal = round(sum(m['calorie'] for m in meals),1) if all(m['calorie'] is not None for m in meals) else '未知'
+            total_pro = round(sum(m['protein'] for m in meals),1) if all(m['protein'] is not None for m in meals) else '未知'
+            lines.append(f"  汇总：热量{total_cal}kcal，蛋白{total_pro}g")
 
         if "food_knowledge" in context and context["food_knowledge"]:
             lines.append("\n相关食物营养知识（每100g）：")
@@ -201,8 +207,8 @@ class RAGService:
                 n = f["nutrition_per_100g"]
                 lines.append(
                     f"  {f['name']}（{f['category']}）："
-                    f"热量{n.get('calorie', 0)}kcal，蛋白{n.get('protein', 0)}g，"
-                    f"脂肪{n.get('fat', 0)}g，碳水{n.get('carb', 0)}g"
+                    f"热量{n.get('calorie', '未知')}kcal，蛋白{n.get('protein', '未知')}g，"
+                    f"脂肪{n.get('fat', '未知')}g，碳水{n.get('carb', '未知')}g"
                 )
 
         if "weight" in context and context["weight"]:
