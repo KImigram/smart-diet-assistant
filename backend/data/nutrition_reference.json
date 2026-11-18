@@ -1,0 +1,30 @@
+{
+  "dataset": "FDA raw produce poster reference v1",
+  "basis": "Raw edible portion. Source poster values are rounded label references, not laboratory precision or cooked-dish values.",
+  "units": {"calorie":"kcal","protein":"g","fat":"g","carb":"g","fiber":"g","sodium":"mg"},
+  "columns": ["name","category","source_food","portion_g","calorie","protein","fat","carb","fiber","sodium"],
+  "fruit_url": "https://www.fda.gov/food/nutrition-food-labeling-and-critical-foods/raw-fruits-poster-text-version-accessible-version",
+  "vegetable_url": "https://www.fda.gov/food/nutrition-food-labeling-and-critical-foods/nutrition-information-raw-vegetables",
+  "rows": [
+    ["牛油果（生）","水果","Avocado California",30,50,1,4.5,3,1,0],
+    ["美式甜瓜（生）","水果","Cantaloupe",134,50,1,0,12,1,20],
+    ["葡萄柚（生）","水果","Grapefruit",154,60,1,0,15,2,0],
+    ["猕猴桃（生）","水果","Kiwifruit",148,90,1,1,20,4,0],
+    ["柠檬（生）","水果","Lemon",58,15,0,0,5,2,0],
+    ["青柠（生）","水果","Lime",67,20,0,0,7,2,0],
+    ["油桃（生）","水果","Nectarine",140,60,1,0.5,15,2,0],
+    ["桃（生）","水果","Peach",147,60,1,0.5,15,2,0],
+    ["梨（生）","水果","Pear",166,100,1,0,26,6,0],
+    ["菠萝（生）","水果","Pineapple",112,50,1,0,13,1,10],
+    ["李子（生）","水果","Plums",151,70,1,0,19,2,0],
+    ["草莓（生）","水果","Strawberries",147,50,1,0,11,2,0],
+    ["芦笋（生）","蔬菜","Asparagus",93,20,2,0,4,2,0],
+    ["甜椒（生）","蔬菜","Bell Pepper",148,25,1,0,6,2,40],
+    ["菜花（生）","蔬菜","Cauliflower",99,25,2,0,5,2,30],
+    ["芹菜（生）","蔬菜","Celery",110,15,0,0,4,2,115],
+    ["四季豆（生）","蔬菜","Green Snap Beans",83,20,1,0,5,3,0],
+    ["结球生菜（生）","蔬菜","Iceberg Lettuce",89,10,1,0,2,1,10],
+    ["蘑菇（生）","蔬菜","Mushrooms",84,20,3,0,3,1,15],
+    ["洋葱（生）","蔬菜","Onion",148,45,1,0,11,3,5]
+  ]
+}
