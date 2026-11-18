@@ -27,8 +27,14 @@ def load_cases(path: Path) -> list[dict]:
             raise ValueError("未知数据划分")
         if not isinstance(case["answerable"], bool) or bool(case["evidence"]) != case["answerable"]:
             raise ValueError("有答案题必须有证据，无答案题证据应为空")
-        for evidence in case["evidence"]:
-            source = evidence["source"]
+        if not isinstance(case.get('history'), list):
+            raise ValueError('history 必须是消息列表')
+        for message in case['history']:
+            if message.get('role') not in {'user', 'assistant'} or not isinstance(message.get('content'), str):
+                raise ValueError('历史只能包含 user/assistant 文本消息')
+        # Include dishes used as distractors or history topics in split isolation.
+        related = {e['source'] for e in case['evidence']} | set(case.get('related_sources', []))
+        for source in related:
             if sources.setdefault(source, case["split"]) != case["split"]:
                 raise ValueError(f"同一道菜不能跨 dev/test 划分：{source}")
     return cases

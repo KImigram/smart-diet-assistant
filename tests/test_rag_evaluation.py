@@ -79,6 +79,35 @@ def test_v2_changes_only_dev_evidence():
     compile_labels(revised, split_recipe_documents(load_recipe_documents()))
 
 
+def test_expanded_questions_preserve_regression_and_cover_new_scenarios():
+    original = load_cases(PROJECT/'backend/evals/rag_questions_v2.jsonl')
+    expanded = load_cases(PROJECT/'backend/evals/rag_questions_v3.jsonl')
+    assert expanded[:len(original)] == original
+    assert len(expanded) == 200
+    assert sum(not c['answerable'] for c in expanded) == 30
+    sources = {e['source'] for c in expanded for e in c['evidence']}
+    assert len(sources) == 60
+    added = expanded[len(original):]
+    assert len([c for c in added if c['category'] == 'long_history_followup']) == 10
+    assert all(len(c['history']) == 8 for c in added if c['category'] == 'long_history_followup')
+    assert {c.get('negative_kind') for c in added if not c['answerable']} == {
+        'missing_recipe', 'unsupported_nutrition', 'requires_database',
+        'out_of_domain', 'unsupported_medical', 'missing_detail'}
+    compile_labels(expanded, split_recipe_documents(load_recipe_documents()))
+
+
+def test_history_distractors_cannot_leak_across_splits(tmp_path):
+    cases = [{'id':split, 'split':split, 'question':'question', 'history':[],
+              'answerable':False, 'evidence':[], 'related_sources':['same.md']}
+             for split in ['dev','test']]
+    path = tmp_path/'invalid.jsonl'
+    path.write_text('\n'.join(json.dumps(c) for c in cases), encoding='utf-8')
+    with pytest.raises(ValueError, match='跨 dev/test'):
+        load_cases(path)
+
+
+
+
 def test_errors_are_not_counted_as_successful_negative_rejections():
     rows = [{'answerable':False,'error':'boom','accepted':[]},
             {'answerable':False,'error':None,'accepted':[]}]
@@ -106,6 +135,10 @@ def test_runner_writes_complete_report_without_model(tmp_path, monkeypatch):
     assert report['summary']['questions'] == len(report['rows'])
     assert (out/'summary.md').exists()
     assert report['summary']['negative_rejection_rate'] == 0
+    assert report['by_cohort']['regression']['questions'] == 46
+    assert report['by_cohort']['new']['questions'] > 0
+    assert report['by_category']['history_correction']['questions'] > 0
+    assert report['by_negative_kind']['requires_database']['questions'] > 0
     report['adapter_info']['score_type'] = 'cosine_distance_lower_is_better'
     results = sweep(report, [.1, .3], 3)
     assert len(results[1]['positive_empty_ids']) == report['summary']['answerable']
@@ -116,3 +149,35 @@ def test_runner_writes_complete_report_without_model(tmp_path, monkeypatch):
     changed['dataset_hash'] = 'different'
     with pytest.raises(ValueError, match='dataset_hash'):
         compare(report, changed)
+
+
+def test_regression_suite_uses_only_original_dev_cases(tmp_path, monkeypatch):
+    from evals import adapters
+    class EmptyAdapter:
+        info = {'name':'test-only'}
+        def retrieve(self, question, history, k):
+            return []
+    monkeypatch.setattr(adapters, 'create_dense', lambda options: EmptyAdapter())
+    out = tmp_path/'regression'
+    monkeypatch.setattr(sys, 'argv', ['eval', '--suite', 'regression', '--output', str(out)])
+    runner.main()
+    report = json.loads((out/'report.json').read_text(encoding='utf-8'))
+    assert report['summary']['questions'] == 46
+    assert list(report['by_cohort']) == ['regression']
+    assert report['case_ids'] == [c['id'] for c in load_cases(PROJECT/'backend/evals/rag_questions_v2.jsonl') if c['split']=='dev']
+
+
+def test_category_and_cohort_filters_select_only_requested_cases(tmp_path, monkeypatch):
+    from evals import adapters
+    class EmptyAdapter:
+        info = {'name':'test-only'}
+        def retrieve(self, question, history, k):
+            return []
+    monkeypatch.setattr(adapters, 'create_dense', lambda options: EmptyAdapter())
+    out = tmp_path/'filtered'
+    monkeypatch.setattr(sys, 'argv', ['eval', '--suite','expanded', '--cohort','new',
+                                     '--category','long_history_followup', '--output',str(out)])
+    runner.main()
+    report = json.loads((out/'report.json').read_text(encoding='utf-8'))
+    assert report['summary']['questions'] > 0
+    assert all(row['cohort']=='new' and row['category']=='long_history_followup' for row in report['rows'])

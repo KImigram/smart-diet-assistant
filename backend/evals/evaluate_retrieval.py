@@ -31,7 +31,13 @@ def percentile(values, quantile):
 
 def main():
     parser = argparse.ArgumentParser(description="固定菜谱检索评测；正式运行会加载本地模型")
-    parser.add_argument("--questions", type=Path, default=Path(__file__).with_name("rag_questions_v2.jsonl"))
+    dataset_args = parser.add_mutually_exclusive_group()
+    dataset_args.add_argument("--questions", type=Path, help="自定义题库路径")
+    dataset_args.add_argument("--suite", choices=['regression', 'expanded'], default=None,
+                              help="regression 原90题；expanded 扩展200题（默认）")
+    parser.add_argument('--cohort', choices=['all', 'regression', 'new'], default='all',
+                        help='只运行旧题或新增题，默认全部')
+    parser.add_argument('--category', nargs='+', help='只运行指定问题类别')
     parser.add_argument("--validate-only", action="store_true", help="只校验题库证据，不加载模型")
     parser.add_argument("--split", choices=["dev", "test", "all"], default="dev")
     parser.add_argument("--mode", choices=["raw", "oracle"], default="raw",
@@ -44,6 +50,9 @@ def main():
     parser.add_argument("--overlap", type=int, default=80)
     parser.add_argument("--output", type=Path, help="新的输出目录，默认 evals/outputs/时间戳")
     args = parser.parse_args()
+    if args.questions is None:
+        filename = 'rag_questions_v2.jsonl' if args.suite == 'regression' else 'rag_questions_v3.jsonl'
+        args.questions = Path(__file__).with_name(filename)
     ks = sorted(set(args.ks))
     if not ks or min(ks) < 1:
         parser.error("K 必须为正整数")
@@ -68,7 +77,14 @@ def main():
     if args.validate_only:
         print("全部原文证据匹配通过；未加载模型。")
         return
-    selected = [c for c in cases if args.split == "all" or c["split"] == args.split]
+    if args.category:
+        unknown = set(args.category) - {case['category'] for case in cases}
+        if unknown:
+            parser.error(f'未知问题类别：{sorted(unknown)}')
+    selected = [c for c in cases
+                if (args.split == "all" or c["split"] == args.split)
+                and (args.cohort == 'all' or c.get('cohort', 'regression') == args.cohort)
+                and (not args.category or c['category'] in args.category)]
     if not selected:
         parser.error("选中的划分没有问题")
     output = args.output or Path(__file__).parent / "outputs" / datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -93,6 +109,7 @@ def main():
         start = time.perf_counter()
         error = None
         hits = []
+        adapter.last_rewrite = None
         try:
             result = adapter.retrieve(question, case["history"], max(ks))
             seen = set()
@@ -112,6 +129,8 @@ def main():
         elapsed_ms = (time.perf_counter() - start) * 1000
         accepted = [h for h in hits if h["accepted"]]
         row = {"id": case["id"], "category": case["category"], "answerable": case["answerable"],
+               'cohort': case.get('cohort', 'regression'),
+               'negative_kind': case.get('negative_kind', 'legacy_unspecified') if not case['answerable'] else None,
                "question": case["question"], "effective_question": question, "history": case["history"],
                "evidence": case["evidence"], "raw_hits": hits, "accepted": accepted,
                "gold_chunk_ids": sorted(labels[case["id"]]["relevant"]),
@@ -142,6 +161,12 @@ def main():
               "remaining_queries_p50_ms": percentile([r['elapsed_ms'] for r in rows[1:] if not r['error']], .5),
               "remaining_queries_p95_ms": percentile([r['elapsed_ms'] for r in rows[1:] if not r['error']], .95),
               "summary": summary, "by_category": groups, "rows": rows}
+    report['selection'] = {'suite': args.suite or ('custom' if args.questions.name not in {'rag_questions_v2.jsonl', 'rag_questions_v3.jsonl'} else args.questions.stem),
+                           'questions_file': str(args.questions), 'cohort': args.cohort, 'categories': args.category}
+    report['by_cohort'] = {cohort: aggregate([row for row in rows if row['cohort'] == cohort], ks)
+                           for cohort in sorted({row['cohort'] for row in rows})}
+    report['by_negative_kind'] = {kind: aggregate([row for row in rows if row['negative_kind'] == kind], ks)
+                                  for kind in sorted({row['negative_kind'] for row in rows if row['negative_kind']})}
     report['rewrite_summary'] = {
         'attempted':sum(bool(r['rewrite']) and r['rewrite']['status'] != 'no_history' for r in rows),
         'changed':sum(bool(r['rewrite']) and r['rewrite']['changed'] for r in rows),
@@ -156,6 +181,18 @@ def main():
     lines += ["", f"无答案题拒绝率：{summary['negative_rejection_rate']}",
               f"有答案题空结果率：{summary['positive_empty_rate']}", f"错误数：{summary['errors']}",
               "", "拒绝率只评价检索过滤，不代表生成模型已正确拒答。逐题原文、分数和错误见 report.json。"]
+    for title, breakdown in [('旧题/新题', report['by_cohort']), ('问题类别', groups)]:
+        lines += ['', f'## {title}', '', '| 类别 | 题数 | 有答案 | Top-1证据命中 | Top-3证据命中 | 错误数 |',
+                  '|---|---|---|---|---|---|']
+        for name, result in breakdown.items():
+            def hit_at(k):
+                value = result['accepted_metrics'].get(str(k), {}).get('evidence_hit')
+                return f'{value:.2%}' if value is not None else '—'
+            lines.append(f"| {name} | {result['questions']} | {result['answerable']} | {hit_at(1)} | {hit_at(3)} | {result['errors']} |")
+    if report['by_negative_kind']:
+        lines += ['', '## 无答案场景', '', '| 类型 | 题数 | 检索拒绝率 |', '|---|---|---|']
+        for kind, result in report['by_negative_kind'].items():
+            lines.append(f"| {kind} | {result['questions']} | {result['negative_rejection_rate']:.2%} |")
     if report['rewrite_summary']['attempted']:
         lines += ["", "## 查询改写", "", str(report['rewrite_summary']), "",
                   "| 题号 | 原问题 | 检索问题 | 状态 | 改写耗时 ms |", "|---|---|---|---|---|"]
