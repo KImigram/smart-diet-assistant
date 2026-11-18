@@ -34,9 +34,11 @@ def test_metrics_do_not_confuse_same_document_with_evidence():
     assert metrics['1']['document_hit'] == 1
     assert metrics['1']['evidence_hit'] == 0
     assert metrics['2']['evidence_recall'] == .5
+    assert metrics['2']['all_evidence_hit'] == 0
     assert metrics['2']['evidence_precision'] == .5
     assert metrics['2']['mrr'] == .5
     assert metrics['3']['evidence_group_coverage'] == 1
+    assert metrics['3']['all_evidence_hit'] == 1
     assert 0 < metrics['3']['ndcg'] < 1
 
 
@@ -106,6 +108,19 @@ def test_history_distractors_cannot_leak_across_splits(tmp_path):
         load_cases(path)
 
 
+def test_multifact_suite_really_requires_multiple_chunks():
+    cases = load_cases(PROJECT/'backend/evals/rag_multifact_v1.jsonl')
+    labels = compile_labels(cases, split_recipe_documents(load_recipe_documents()))
+    assert len(cases) >= 30
+    assert {c['category'] for c in cases} == {'cross_recipe_multifact', 'same_recipe_multifact', 'three_fact'}
+    for case in cases:
+        label = labels[case['id']]
+        assert len(label['groups']) >= 2
+        assert not set.intersection(*label['groups'])
+        hits = [{'chunk_id':identity, 'source':'ignored'} for identity in sorted(label['relevant'])]
+        metrics = rank_metrics(hits, label, [1, len(hits)])
+        assert metrics['1']['all_evidence_hit'] == 0
+        assert metrics[str(len(hits))]['all_evidence_hit'] == 1
 
 
 def test_errors_are_not_counted_as_successful_negative_rejections():

@@ -33,8 +33,8 @@ def main():
     parser = argparse.ArgumentParser(description="固定菜谱检索评测；正式运行会加载本地模型")
     dataset_args = parser.add_mutually_exclusive_group()
     dataset_args.add_argument("--questions", type=Path, help="自定义题库路径")
-    dataset_args.add_argument("--suite", choices=['regression', 'expanded'], default=None,
-                              help="regression 原90题；expanded 扩展200题（默认）")
+    dataset_args.add_argument("--suite", choices=['regression', 'expanded', 'multifact'], default=None,
+                              help="regression 原90题；expanded 扩展200题（默认）；multifact 多事实专项")
     parser.add_argument('--cohort', choices=['all', 'regression', 'new'], default='all',
                         help='只运行旧题或新增题，默认全部')
     parser.add_argument('--category', nargs='+', help='只运行指定问题类别')
@@ -51,7 +51,7 @@ def main():
     parser.add_argument("--output", type=Path, help="新的输出目录，默认 evals/outputs/时间戳")
     args = parser.parse_args()
     if args.questions is None:
-        filename = 'rag_questions_v2.jsonl' if args.suite == 'regression' else 'rag_questions_v3.jsonl'
+        filename = {'regression':'rag_questions_v2.jsonl', 'multifact':'rag_multifact_v1.jsonl'}.get(args.suite, 'rag_questions_v3.jsonl')
         args.questions = Path(__file__).with_name(filename)
     ks = sorted(set(args.ks))
     if not ks or min(ks) < 1:
@@ -175,9 +175,9 @@ def main():
     output.mkdir(parents=True)
     (output / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     lines = ["# Retrieval evaluation / 检索评测", "", f"split={args.split}, mode={args.mode}",
-             "", "| K | 证据命中 | 菜谱命中 | 证据召回 | 精确率 | MRR | nDCG |", "|---|---|---|---|---|---|---|"]
+             "", "| K | 至少一份证据命中 | 全部证据命中 | 证据组覆盖率 | 菜谱命中 | 证据召回 | 精确率 | MRR | nDCG |", "|---|---|---|---|---|---|---|---|---|"]
     for k, metric in summary['accepted_metrics'].items():
-        lines.append("| " + k + " | " + " | ".join(f"{metric.get(name,0):.4f}" for name in ['evidence_hit','document_hit','evidence_recall','evidence_precision','mrr','ndcg']) + " |")
+        lines.append("| " + k + " | " + " | ".join(f"{metric.get(name,0):.4f}" for name in ['evidence_hit','all_evidence_hit','evidence_group_coverage','document_hit','evidence_recall','evidence_precision','mrr','ndcg']) + " |")
     lines += ["", f"无答案题拒绝率：{summary['negative_rejection_rate']}",
               f"有答案题空结果率：{summary['positive_empty_rate']}", f"错误数：{summary['errors']}",
               "", "拒绝率只评价检索过滤，不代表生成模型已正确拒答。逐题原文、分数和错误见 report.json。"]

@@ -94,6 +94,7 @@ def rank_metrics(hits: list[dict], label: dict, ks: list[int]) -> dict:
         ideal = sum(1 / math.log2(i + 2) for i in range(min(k, len(gold))))
         metrics[str(k)] = {
             "evidence_hit": float(matched > 0),
+            "all_evidence_hit": float(bool(label['groups']) and all(ids & group for group in label['groups'])),
             "document_hit": float(any(h["source"] in label["sources"] for h in ranked)),
             "evidence_recall": matched / len(gold) if gold else 0.0,
             "evidence_precision": matched / k,

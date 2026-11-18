@@ -20,7 +20,10 @@ def compare(left: dict, right: dict, allow_mode_change=False) -> str:
     if left['mode'] != right['mode']:
         lines.append("注意：oracle 使用人工完整问题，仅作为参考上限，不代表自动问题改写已实现。")
     for k in left['ks']:
-        for name in ["evidence_hit", "document_hit", "evidence_recall", "evidence_precision", "mrr", "ndcg", "evidence_group_coverage"]:
+        names = ["evidence_hit", "all_evidence_hit", "document_hit", "evidence_recall", "evidence_precision", "mrr", "ndcg", "evidence_group_coverage"]
+        for name in names:
+            if name not in left['summary']['accepted_metrics'][str(k)] or name not in right['summary']['accepted_metrics'][str(k)]:
+                continue  # Older saved reports do not contain the new full-coverage metric.
             a = left['summary']['accepted_metrics'][str(k)][name]
             b = right['summary']['accepted_metrics'][str(k)][name]
             lines.append(f"{name}@{k}: {a:.4f} -> {b:.4f} (delta={b-a:+.4f})")

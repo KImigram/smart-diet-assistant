@@ -98,3 +98,20 @@ python backend/evals/evaluate_retrieval.py --suite expanded --split dev --cohort
 
 回归描述用途，开发/测试描述使用阶段。回归题也可以属于开发集或保留测试集，两种划分可以同时存在。
 
+## 多事实专项
+
+`rag_multifact_v1.jsonl` 是独立的 44 题专项，原 200 题保持原样。专项包含同一道菜跨章节的 14 题、跨菜谱的 15 题和三项事实的 15 题。开发集 23 题，保留测试集 21 题，沿用 v3 的菜谱分组。专项与 v3 复用部分事实，成绩应单独报告，不作为新增独立样本累计进 v3 总分。
+
+每题标注至少两个必要证据组，并验证不存在任何一个文本块能同时覆盖全部组。等价证据是同一事实的多个有效位置，找齐这些等价位置不是答题要求。找齐每个必要组中的至少一个位置才算完整命中。
+
+新增 `all_evidence_hit`（全部证据组命中）指标，与 `evidence_hit`（至少命中一个证据组）、`evidence_group_coverage`（已覆盖组数占比）共同展示。该完整命中指标衡量标注证据是否找齐，未评价模型能否正确综合答案。
+
+专项问题不携带历史，当前问题明确列出所问的菜和事实，便于观察检索和融合本身。可用以下命令选择专项开发题。正式测评会加载已有本地模型。
+
+```powershell
+python backend/evals/evaluate_retrieval.py --suite multifact --validate-only
+python backend/evals/evaluate_retrieval.py --suite multifact --split dev --adapter evals.adapters:create_dense
+python backend/evals/evaluate_retrieval.py --suite multifact --split dev --adapter evals.adapters:create_hybrid
+```
+
+默认 K=1/3/5。每题至少需要两个块，因此 K=1 的完整命中应为零。改变 K 时应同时考虑上下文长度和噪声。
