@@ -1,25 +1,37 @@
-# 智能饮食助手
+# Smart Diet Assistant
 
-[简体中文](README.md) · [English](README.en.md)
+English · [简体中文](README.zh-CN.md)
 
-一个用 Qt 和 FastAPI 构建的桌面应用，支持记录饮食、查看营养摄入和查询做法。
+A Qt desktop app for photo-based dish recognition, meal logging, and nutrition Q&A, backed by FastAPI and MySQL.
 
-## 项目功能
+## Features
 
-- **拍照识别菜品**：微调后的 MiniCPM-V 提供候选，基座模型核验结果，用户可以确认或纠正菜名。
-- **饮食和健康记录**：记录食物和份量，查看每日及每周营养统计，跟踪体重变化。
-- **多轮饮食问答**：结合 MySQL 饮食记录、食物营养数据和 300 篇菜谱，回答历史摄入、指定份量营养和菜品做法等问题。
-- **运动计划与打卡**：生成每日运动计划，确认后记录任务完成情况。
+- **Dish recognition** — Identify dishes from a photo, then confirm or correct the result.
+- **Meal and health tracking** — Record portions, review daily and weekly nutrition totals, and track weight.
+- **Multi-turn Q&A** — Ask what you ate, calculate nutrients for a given portion, or look up a recipe.
+- **Exercise plans and check-ins** — Generate a daily plan and mark completed activities.
 
-## 项目结构
+## How it works
 
-| 路径 | 内容 |
-| --- | --- |
-| `src/` | Qt/C++ 桌面界面 |
-| `backend/main.py` | FastAPI 接口入口 |
-| `backend/ai/` | MiniCPM-V 识别服务与模型客户端 |
-| `backend/rag/` | 对话查询计划、菜谱检索和回答生成 |
-| `backend/services/`、`backend/dao/`、`backend/database/` | 业务逻辑、MySQL 数据访问和建表脚本 |
-| `backend/data/` | 菜谱原文和营养参考数据 |
-| `backend/scripts/`、`backend/evals/`、`tests/` | 建库脚本、检索评测和自动化测试 |
-| `dataset/`、`build_dataset.py` | 视觉微调数据清单与生成脚本 |
+- **Vision fine-tuning** — MiniCPM-V was fine-tuned with LoRA on dish images prepared from ChineseFoodNet. During inference, the fine-tuned model proposes a dish name. The base model checks the prediction, identifies the dish itself if it rejects the proposal, and provides an ingredient description.
+- **Recipe RAG and database queries** — The language model resolves follow-up references and produces a structured query plan. Python validates it, queries MySQL with parameterized SQL, and calculates nutrients from portion weights. Recipe questions use a BGE-M3 and Chroma index of 300 recipes, with optional BM25 hybrid retrieval. The language model then answers using the database results and retrieved recipe excerpts.
+
+## Project structure
+
+```text
+smart-diet-assistant/
+├── src/                    # Qt/C++ desktop client
+├── backend/
+│   ├── main.py              # FastAPI entry point
+│   ├── ai/                  # Vision service and model clients
+│   ├── rag/                 # Query planning, retrieval, and response generation
+│   ├── services/            # Meal, nutrition, and recognition logic
+│   ├── dao/                 # Database queries
+│   ├── database/            # MySQL schema and seed data
+│   ├── data/                # Recipes and nutrition reference data
+│   ├── scripts/             # Index building and utility scripts
+│   └── evals/               # Retrieval benchmarks
+├── dataset/                # Vision fine-tuning manifests
+├── build_dataset.py        # Vision dataset preparation
+└── tests/                  # Automated tests
+```
