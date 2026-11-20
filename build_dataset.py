@@ -12,10 +12,11 @@ from pathlib import Path
 
 from PIL import Image
 
-CLASSES_FILE = r"D:\my program\Python work\smart_diet\chinesefoodnet_classes.txt"
-VAL_DIR = Path(r"D:\DataSet\dataset_release\release_data\val")
-MAP_OUT = Path(r"D:\my program\Python work\smart_diet\class_mapping.txt")
-OUT_DIR = Path(r"D:\my program\Python work\smart_diet\dataset")
+PROJECT_DIR = Path(__file__).resolve().parent
+CLASSES_FILE = PROJECT_DIR / "chinesefoodnet_classes.txt"
+VAL_DIR = Path(os.getenv("CHINESEFOODNET_VAL_DIR", PROJECT_DIR / "release_data" / "val"))
+MAP_OUT = PROJECT_DIR / "class_mapping.txt"
+OUT_DIR = PROJECT_DIR / "dataset"
 
 PER_CLASS = 20       # 每类抽样张数
 TRAIN_SPLIT = 18     # 每类 train 张数(其余为 val)
