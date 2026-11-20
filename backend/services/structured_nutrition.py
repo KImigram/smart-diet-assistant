@@ -10,6 +10,12 @@ from dao.meal_dao import MealDAO
 NUTRIENTS = ('calorie','protein','fat','carb','fiber','sodium')
 UNITS = {'calorie':'kcal','protein':'g','fat':'g','carb':'g','fiber':'g','sodium':'mg'}
 GRAMS = re.compile(r'(\d+(?:\.\d+)?)\s*(千克|公斤|kg|克|g)', re.IGNORECASE)
+MEAL_ALIASES = {
+    '早餐': ('早餐', '早饭'),
+    '午餐': ('午餐', '午饭', '中饭', '中餐'),
+    '晚餐': ('晚餐', '晚饭'),
+    '加餐': ('加餐',),
+}
 
 
 def portion_values(nutrition, grams):
@@ -49,7 +55,8 @@ def resolve_period(question, today=None):
         raise ValueError('请提供明确的起止日期，范围不超过31天')
     if not 0 <= (end-start).days < 31:
         raise ValueError('日期范围需为1至31天，且起始日期不得晚于结束日期')
-    meals = [meal for meal in ['早餐','午餐','晚餐','加餐'] if meal in question]
+    meals = [meal for meal, aliases in MEAL_ALIASES.items()
+             if any(alias in question for alias in aliases)]
     return {'start_date':str(start),'end_date':str(end),'meal_types':meals}
 
 
@@ -60,15 +67,41 @@ def matching_foods(question):
     for food in foods:
         stem = re.sub(r'[（(].*?[）)]','',food['name'])
         for alias in {food['name'],stem,*aliases.get(food['name'],[])}:
-            offset = question.find(alias)
-            if offset>=0:
-                candidates.append((len(alias),offset,offset+len(alias),food))
+            for match in re.finditer(re.escape(alias), question):
+                candidates.append((len(alias),match.start(),match.end(),food))
     chosen = []
     for length,start,end,food in sorted(candidates,key=lambda row:(-row[0],row[1],row[3]['id'])):
         if any(start<e and end>s for s,e,_ in chosen):
             continue
         chosen.append((start,end,food))
     return sorted(chosen,key=lambda row:row[0])
+
+
+def nutrition_reference(food, citation, grams=None):
+    nutrition = FoodDAO.get_nutrition(food['id'])
+    sources = execute_query('SELECT dataset,source_url,source_food,source_portion_g,note FROM food_nutrition_sources WHERE food_id=%s',(food['id'],))
+    item = {'citation':citation,'name':food['name'],'category':food['category'],
+            'nutrition_per_100g':nutrition,'units':UNITS,
+            'provenance':sources[0] if sources else {'note':'原有演示数据，未核实来源；只作数据库参考估算。'}}
+    if grams is not None:
+        item['requested_portion_g'] = float(grams)
+        item['requested_nutrition'] = portion_values(nutrition,grams)
+    return item
+
+
+def planned_food_knowledge(requests):
+    result = []
+    for request in requests:
+        name = request.name.strip()
+        label = FoodDAO.get_by_name(name)
+        if label is None:
+            candidates = [food for _, _, food in matching_foods(name)
+                          if re.sub(r'[（(].*?[）)]','',food['name']) == name]
+            if len(candidates) != 1:
+                return None
+            label = candidates[0]
+        result.append(nutrition_reference(label, f'D{len(result)+1}', request.grams))
+    return result
 
 
 def food_knowledge(question):
@@ -80,22 +113,22 @@ def food_knowledge(question):
         if distances:
             distance,index = min(distances)
             if distance <= 6:
-                portions.setdefault(index,[]).append(quantity)
+                food_id = matches[index][2]['id']
+                portions.setdefault(food_id,[]).append(quantity)
     result = []
-    for i,(start,end,food) in enumerate(matches):
-        nutrition = FoodDAO.get_nutrition(food['id'])
-        sources = execute_query('SELECT dataset,source_url,source_food,source_portion_g,note FROM food_nutrition_sources WHERE food_id=%s',(food['id'],))
-        item = {'citation':f'D{i+1}','name':food['name'],'category':food['category'],
-                'nutrition_per_100g':nutrition,'units':UNITS,
-                'provenance':sources[0] if sources else {'note':'原有演示数据，未核实来源；只作数据库参考估算。'}}
-        candidates = portions.get(i,[])
+    seen = set()
+    for _, _, food in matches:
+        if food['id'] in seen:
+            continue
+        seen.add(food['id'])
+        grams = None
+        candidates = portions.get(food['id'],[])
         portion = candidates[0] if len(candidates)==1 else None
         if portion:
-            grams = Decimal(portion[1])*(1000 if portion[2].lower() in {'kg','千克','公斤'} else 1)
-            if 0 < grams <= 10000:
-                item['requested_portion_g'] = float(grams)
-                item['requested_nutrition'] = portion_values(nutrition,grams)
-        result.append(item)
+            quantity = Decimal(portion[1])*(1000 if portion[2].lower() in {'kg','千克','公斤'} else 1)
+            if 0 < quantity <= 10000:
+                grams = quantity
+        result.append(nutrition_reference(food, f'D{len(result)+1}', grams))
     return result
 
 

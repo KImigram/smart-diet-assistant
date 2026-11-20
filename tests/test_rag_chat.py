@@ -31,7 +31,7 @@ def chat_fakes(monkeypatch):
             yield SimpleNamespace(content="含花生 [R1]。")
 
     monkeypatch.setattr(pipeline, "DEEPSEEK_API_KEY", "test-only")
-    monkeypatch.setattr(pipeline, "rewrite_question", lambda question, history: {'query':question})
+    monkeypatch.setattr(pipeline, "analyze_question", lambda question, history: None)
     monkeypatch.setattr(pipeline, "create_chat_model", lambda: FakeModel())
     monkeypatch.setattr(RAGService, "retrieve", lambda user_id, question: context)
     monkeypatch.setattr(ChatDAO, "get_owned_session", lambda session_id, user_id: {"id": session_id})

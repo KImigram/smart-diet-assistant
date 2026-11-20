@@ -15,21 +15,18 @@ REWRITE_PROMPT = """你是检索查询改写器，不回答问题。
 """
 
 
-def create_rewrite_model():
+def create_rewrite_model(max_tokens=256):
     from config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, LLM_MODEL
     if not DEEPSEEK_API_KEY:
         raise RuntimeError("未配置 LLM_API_KEY，无法执行云端查询改写")
     from langchain_openai import ChatOpenAI
     return ChatOpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL,
-                      model=LLM_MODEL, temperature=0, max_tokens=256,
+                      model=LLM_MODEL, temperature=0, max_tokens=max_tokens,
                       timeout=30, max_retries=0,
                       default_headers={"Accept-Encoding":"identity"}).bind(response_format={"type":"json_object"})
 
 
-def rewrite_question(question: str, history: list[dict], model=None) -> dict:
-    start = time.perf_counter()
-    trace = {"original":question, "query":question, "changed":False,
-             "status":"no_history", "error":None, "elapsed_ms":0.0}
+def bounded_history(history):
     # Bounded recent history; role filtering prevents stored system messages
     # from becoming instructions. This is a character budget, not a token budget.
     bounded = []
@@ -41,6 +38,14 @@ def rewrite_question(question: str, history: list[dict], model=None) -> dict:
         budget -= len(content)
         bounded.append({'role':message['role'], 'content':content})
     bounded.reverse()
+    return bounded
+
+
+def rewrite_question(question: str, history: list[dict], model=None) -> dict:
+    start = time.perf_counter()
+    trace = {"original":question, "query":question, "changed":False,
+             "status":"no_history", "error":None, "elapsed_ms":0.0}
+    bounded = bounded_history(history)
     if not bounded:
         return trace
     try:

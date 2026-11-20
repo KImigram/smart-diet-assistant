@@ -62,10 +62,29 @@ def test_pipeline_retrieves_rewrite_but_answers_original(monkeypatch):
         def stream(self,messages):
             assert messages[-1].content=='它蒸多久？'
             yield SimpleNamespace(content='答案')
-    monkeypatch.setenv('RAG_REWRITE_ENABLED','true')
     monkeypatch.setattr(pipeline,'DEEPSEEK_API_KEY','fake')
-    monkeypatch.setattr(pipeline,'rewrite_question',lambda q,h:{'query':'蒜蓉虾蒸多久？'})
-    monkeypatch.setattr(RAGService,'retrieve',lambda user,q: seen.append(q) or {'recipe':[]})
+    plan = SimpleNamespace(query='蒜蓉虾蒸多久？')
+    monkeypatch.setattr(pipeline,'analyze_question',lambda q,h:plan)
+    monkeypatch.setattr(RAGService,'retrieve',
+                        lambda user,q,**kwargs: seen.append((q, kwargs['plan'])) or {'recipe':[]})
     monkeypatch.setattr(pipeline,'create_chat_model',lambda:Model())
     assert pipeline.answer(1,'它蒸多久？',[{'role':'user','content':'蒜蓉虾'}])=='答案'
-    assert seen==['蒜蓉虾蒸多久？']
+    assert seen==[('蒜蓉虾蒸多久？', plan)]
+
+
+def test_query_plan_analyzes_single_turn_and_rejects_changed_portion():
+    from rag.query_plan import analyze_question
+
+    question = '草莓和牛油果各150克，一共多少大卡？'
+    payload = dict(query=question, meal_query=None, recipe_query=None,
+                   foods=[{'name':'草莓', 'grams':150}, {'name':'牛油果','grams':150}],
+                   sum_foods=True, profile=False, weight=False, clarification=None)
+
+    class Model:
+        def invoke(self, messages):
+            assert json.loads(messages[1]['content']) == {'question':question, 'history':[]}
+            return SimpleNamespace(content=json.dumps(payload))
+
+    assert [f.grams for f in analyze_question(question, [], Model()).foods] == [150, 150]
+    payload['foods'][0]['grams'] = 100
+    assert analyze_question(question, [], Model()) is None

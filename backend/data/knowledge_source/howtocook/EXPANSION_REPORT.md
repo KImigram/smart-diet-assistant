@@ -1,7 +1,6 @@
 # HowToCook 菜谱语料扩充报告
 
 - 整理日期：2026-11-16
-- 项目目录：`D:\my program\Python work\smart_diet`
 - 目标目录：`backend/data/knowledge_source/howtocook/recipes`
 - 本次范围：仅菜谱筛选、清理与整理；未修改程序、未建向量库、未调用模型、未生成测评题、未提交 Git。
 
@@ -28,7 +27,6 @@
 
 ## 2. 原始数据位置与版本
 
-- 本地原始数据：`D:\DataSet\HowToCook-master\HowToCook-master`
 - 源仓库：https://github.com/Anduin2017/HowToCook
 - 许可证：Unlicense
 - 版本线索：`package.json` 中 `version` 为 `1.6.0`。
@@ -127,7 +125,7 @@
 - 修改：`INDEX.md`（由 30 条扩充为 300 条，前 30 条记录与顺序原样保留，新增条目按分类追加）。
 - 修改：`SOURCE.md`（保留原有说明，追加本次来源快照）。
 - 新增：`EXPANSION_REPORT.md`（本报告）。
-- 未改动：`.env`、后端与前端程序、依赖清单、测评题库与证据标注、现有向量库、`D:\DataSet\HowToCook-master\HowToCook-master` 原始数据、原有 30 篇菜谱。
+- 未改动：`.env`、后端与前端程序、依赖清单、测评题库与证据标注、现有向量库、HowToCook 原始数据副本 原始数据、原有 30 篇菜谱。
 - 整理脚本仅写入系统临时目录并在完成后清理，项目中未新增任何 Python 或 PowerShell 代码文件。
 - 未执行 Git 提交。
 

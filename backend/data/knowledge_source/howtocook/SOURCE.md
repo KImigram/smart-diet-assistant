@@ -8,7 +8,6 @@
 
 ## 本次扩充快照
 
-- 本地原始数据位置：`D:\DataSet\HowToCook-master\HowToCook-master`
 - 源仓库版本线索：`package.json` 中 `version` 为 `1.6.0`；本地副本不含 `.git` 目录，无法确定具体 commit。
 - 快照整理时间：2026-11-16
 - 收录规模：`recipes/` 下共 300 篇菜谱，其中原有 30 篇、本次新增 270 篇。

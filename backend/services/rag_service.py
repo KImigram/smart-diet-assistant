@@ -3,11 +3,12 @@
 从 MySQL 多表检索用户数据 + 从营养知识库向量检索菜谱知识，格式化为上下文，拼接 Prompt
 
 这是 Agent 开发的核心技术：
-1. 查询规划 — 根据问题关键词决定检索哪些数据源（结构化表 / 向量知识库）
+1. 查询规划 — 选取结构化数据，无法确认整条问题只需结构化数据时检索菜谱
 2. 结果聚合 — 多条记录格式化为结构化文本
 3. 上下文工程 — System Prompt + 检索结果 + 历史对话 + 当前问题
 """
 from datetime import datetime, timedelta
+import re
 from dao.user_dao import UserDAO
 from dao.meal_dao import MealDAO
 from dao.food_dao import FoodDAO
@@ -21,14 +22,41 @@ class RAGService:
     # 关键词 → 检索意图映射
     INTENT_KEYWORDS = {
         "profile": ["身高", "体重", "bmi", "档案", "目标", "热量目标", "过敏原", "活动"],
-        "recent_meals": ["今天", "昨天", "最近", "吃了", "饮食", "摄入", "记录", "餐"],
-        "nutrition": ["营养", "蛋白", "脂肪", "碳水", "热量", "卡路里", "维生素", "纤维"],
+        "recent_meals": ["今天", "昨天", "最近", "吃了", "饮食", "摄入", "记录", "餐", "早饭", "午饭", "晚饭"],
+        "nutrition": ["营养", "蛋白", "脂肪", "碳水", "热量", "卡路里", "大卡", "千卡", "kcal", "维生素", "纤维"],
         "food_knowledge": ["什么", "怎么", "能吃", "可以", "好不好", "功效", "作用"],
         "weight": ["体重", "减肥", "增重", "胖", "瘦", "减脂", "增肌"],
-        "recipe": ["怎么做", "做法", "菜谱", "烹饪", "如何做", "怎么煮", "怎么烧",
-                   "怎么炒", "怎么炖", "步骤", "家常", "红烧", "清蒸", "凉拌",
-                   "烘焙", "烤箱", "煎", "炸", "煲汤", "食谱"],
     }
+
+    _CLAUSE_BOUNDARY = re.compile(r'[。！？!?；;，,\n]+')
+    _RECIPE_CUE = re.compile(
+        r'菜谱|食谱|配方|做法|怎么做|怎么煮|怎么炒|怎么炖|如何做|制作|做成|烹饪|食材|原料|'
+        r'下锅|焯|泡多久|泡几|醒面|静置|翻面|切好|几成热|多少度|温度|火候|预热|'
+        r'煮多久|煮几|蒸多久|蒸几|烤多久|烤几|炖多久|炖几|调味|炸多久|适不适合|能不能吃'
+    )
+    _RECORD_CUE = re.compile(
+        r'登记|记录|记下来|记下来的|记过|我.*(?:吃了|吃的|摄入|早饭|午饭|晚饭|早餐|午餐|晚餐|加餐)'
+    )
+    _PROFILE_CUE = re.compile(r'(?:我的?|档案|登记的).*(?:身高|体重|过敏原|热量目标|目标热量|BMI)', re.IGNORECASE)
+    _NUTRITION_CUE = re.compile(r'热量|卡路里|大卡|千卡|kcal|蛋白|脂肪|碳水|纤维|维生素|含钠|钠含量', re.IGNORECASE)
+
+    @staticmethod
+    def needs_recipe_search(question: str) -> bool:
+        from services.structured_nutrition import GRAMS
+
+        clauses = [part.strip() for part in RAGService._CLAUSE_BOUNDARY.split(question)
+                   if part.strip()]
+        if not clauses or RAGService._RECIPE_CUE.search(question):
+            return True
+        # Skip only when every clause has a clear structured-data interpretation.
+        return not all(
+            RAGService._PROFILE_CUE.search(part)
+            or (
+                RAGService._NUTRITION_CUE.search(part)
+                and (RAGService._RECORD_CUE.search(part) or GRAMS.search(part))
+            )
+            for part in clauses
+        )
 
     @staticmethod
     def detect_intents(question: str) -> set[str]:
@@ -47,13 +75,34 @@ class RAGService:
         return intents
 
     @staticmethod
-    def retrieve(user_id: int, question: str) -> dict:
+    def retrieve(user_id: int, question: str, *, plan=None) -> dict:
         """
         检索相关数据，返回结构化上下文字典。
         返回：{profile, recent_meals, food_knowledge, weight, summary}
         """
         intents = RAGService.detect_intents(question)
         context = {}
+        if plan is not None:
+            if plan.clarification:
+                return {'clarification': plan.clarification, 'recipe': []}
+            intents = {'profile'} if plan.profile or plan.meal_query or plan.recipe_query or plan.weight else set()
+            if plan.meal_query:
+                intents.add('recent_meals')
+            if plan.weight:
+                intents.add('weight')
+            if plan.foods:
+                from services.structured_nutrition import planned_food_knowledge, NUTRIENTS, UNITS
+                foods = planned_food_knowledge(plan.foods)
+                if foods is None:
+                    context['food_lookup_incomplete'] = True
+                else:
+                    context['food_knowledge'] = foods
+                    if plan.sum_foods:
+                        portions = [food['requested_nutrition'] for food in foods]
+                        context['food_portion_totals'] = {
+                            key: round(sum(p[key] for p in portions), 1)
+                            if all(p[key] is not None for p in portions) else None for key in NUTRIENTS}
+                        context['food_portion_units'] = UNITS
 
         # 1. 健康档案（几乎总是需要）
         if "profile" in intents:
@@ -62,7 +111,7 @@ class RAGService:
         # 2. 最近饮食记录
         if "recent_meals" in intents:
             from services.structured_nutrition import meal_context
-            context['nutrition_request'] = meal_context(user_id, question)
+            context['nutrition_request'] = meal_context(user_id, plan.meal_query if plan else question)
             context['recent_meals'] = context['nutrition_request']['records']
             request = context['nutrition_request']
             if request['status'] == 'ok' and request['start_date'] == request['end_date'] and not request['meal_types']:
@@ -81,15 +130,12 @@ class RAGService:
         if "weight" in intents:
             context["weight"] = RAGService._retrieve_weight(user_id)
 
-        structured_question = any(word in question for word in [
-            '今天','昨天','登记','记录','档案','体重','热量','蛋白','脂肪','碳水','纤维','卡路里','营养','维生素'])
-        recipe_question = 'recipe' in intents or any(word in question for word in [
-            '怎么','如何','为什么','食材','原料','工具','隔夜','配方','过敏','忌口','能吃'])
-        if structured_question and not recipe_question:
-            context['recipe'] = []
-        else:
+        context['recipe'] = []
+        recipe_query = (plan.recipe_query if plan is not None else
+                        question if RAGService.needs_recipe_search(question) else None)
+        if recipe_query:
             from rag.runtime import recipe_context
-            context['recipe'] = recipe_context(question)
+            context['recipe'] = recipe_context(recipe_query)
 
         return context
 

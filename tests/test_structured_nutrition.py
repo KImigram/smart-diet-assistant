@@ -12,6 +12,7 @@ from services import structured_nutrition as module
 def test_dates_and_meal_types_are_exact():
     today = date(2026,11,18)
     assert resolve_period('昨天午餐',today) == {'start_date':'2026-11-17','end_date':'2026-11-17','meal_types':['午餐']}
+    assert resolve_period('昨天午饭多少大卡？晚上想喝紫菜蛋花汤。', today)['meal_types'] == ['午餐']
     assert resolve_period('昨天总热量，不要混入今天',today)['end_date']=='2026-11-17'
     assert resolve_period('今天和昨天分别登记多少',today)['start_date']=='2026-11-17'
     assert resolve_period('2026-09-18到2026-09-20',today)['start_date']=='2026-09-18'
@@ -43,6 +44,44 @@ def test_debug_context_handles_unknown_nutrients():
     assert '汇总：热量未知' in result
 
 
+def test_chat_runs_both_sources_for_colloquial_nutrition_and_recipe(monkeypatch):
+    from rag import runtime
+    from services.rag_service import RAGService
+
+    question = '60克牛油果多少大卡？美式炒蛋的蛋液要静置多久？'
+    calls = []
+    monkeypatch.setattr(RAGService, '_retrieve_profile', lambda _: {})
+    monkeypatch.setattr(module, 'meal_context', lambda *_: {'status':'no_records','records':[]})
+    monkeypatch.setattr(RAGService, '_retrieve_food_knowledge',
+                        lambda query: calls.append(('food', query)) or [{'name':'牛油果'}])
+    monkeypatch.setattr(runtime, 'recipe_context',
+                        lambda query: calls.append(('recipe', query)) or [{'title':'美式炒蛋'}])
+    context = RAGService.retrieve(1, question)
+    assert calls == [('food', question), ('recipe', question)]
+    assert context['food_knowledge'] and context['recipe']
+
+    calls.clear()
+    pure_question = '60克牛油果多少大卡？'
+    context = RAGService.retrieve(1, pure_question)
+    assert calls == [('food', pure_question)]
+    assert context['recipe'] == []
+
+
+@pytest.mark.parametrize(('question', 'should_search'), [
+    ('我今天登记了多少热量？', False),
+    ('我昨天午饭吃了多少蛋白质？', False),
+    ('我今天登记了多少大卡？我档案里的目标热量是多少？', False),
+    ('我今天登记了多少热量？我可以加点什么？', True),
+    ('我一天摄入多少大卡，紫菜下锅前泡多久？', True),
+    ('我今天的饮食记录加上蛋炒饭怎么做？', True),
+    ('45分钟够吗？', True),
+])
+def test_recipe_route_only_skips_known_structured_questions(question, should_search):
+    from services.rag_service import RAGService
+
+    assert RAGService.needs_recipe_search(question) is should_search
+
+
 def test_food_matching_prefers_long_name_and_supports_before_after_portions(monkeypatch):
     foods=[{'id':1,'name':'桃（生）','category':'水果'},
            {'id':2,'name':'油桃（生）','category':'水果'},
@@ -55,3 +94,5 @@ def test_food_matching_prefers_long_name_and_supports_before_after_portions(monk
     assert [row['requested_nutrition']['calorie'] for row in result]==[24,60]
     result = food_knowledge('60克油桃和150克草莓有多少热量？')
     assert [row['requested_portion_g'] for row in result]==[60,150]
+    result = food_knowledge('下午想吃点草莓，再烤个巴斯克。150克草莓多少大卡？')
+    assert len(result)==1 and result[0]['requested_portion_g']==150
