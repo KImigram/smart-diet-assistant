@@ -1,0 +1,72 @@
+# IDE and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.user
+*.user.*
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Conda / virtual environments
+.venv/
+venv/
+env/
+.conda/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Logs and runtime files
+*.log
+logs/
+*.pid
+
+# Qt / C++ build products
+build*/
+debug/
+release/
+frontend/
+*.o
+*.obj
+*.exe
+*.dll
+*.a
+*.lib
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+
+# Generated RAG indexes (rebuild locally)
+backend/data/vector_db/*
+!backend/data/vector_db/.gitkeep
+backend/data/knowledge_db/
+
+# Local model weights and training outputs
+/models/
+checkpoints/
+outputs/
+runs/
+wandb/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+
+# Local scratch images
+img.png
+img_1.png
+
