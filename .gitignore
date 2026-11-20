@@ -55,7 +55,7 @@ backend/data/vector_db/*
 backend/data/knowledge_db/
 
 # Local model weights and training outputs
-models/
+/models/
 checkpoints/
 outputs/
 runs/
