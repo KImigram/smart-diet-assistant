@@ -6,10 +6,10 @@ import re
 from database.connection import execute_query
 from dao.food_dao import FoodDAO
 from dao.meal_dao import MealDAO
+from services.portion_units import PORTION_WEIGHT, weight_in_grams
 
 NUTRIENTS = ('calorie','protein','fat','carb','fiber','sodium')
 UNITS = {'calorie':'kcal','protein':'g','fat':'g','carb':'g','fiber':'g','sodium':'mg'}
-GRAMS = re.compile(r'(\d+(?:\.\d+)?)\s*(千克|公斤|kg|克|g)', re.IGNORECASE)
 MEAL_ALIASES = {
     '早餐': ('早餐', '早饭'),
     '午餐': ('午餐', '午饭', '中饭', '中餐'),
@@ -107,7 +107,7 @@ def planned_food_knowledge(requests):
 def food_knowledge(question):
     matches = matching_foods(question)
     portions = {}
-    for quantity in GRAMS.finditer(question):
+    for quantity in PORTION_WEIGHT.finditer(question):
         distances = [(max(start-quantity.end(),quantity.start()-end,0),i)
                      for i,(start,end,_) in enumerate(matches)]
         if distances:
@@ -125,7 +125,7 @@ def food_knowledge(question):
         candidates = portions.get(food['id'],[])
         portion = candidates[0] if len(candidates)==1 else None
         if portion:
-            quantity = Decimal(portion[1])*(1000 if portion[2].lower() in {'kg','千克','公斤'} else 1)
+            quantity = weight_in_grams(portion)
             if 0 < quantity <= 10000:
                 grams = quantity
         result.append(nutrition_reference(food, f'D{len(result)+1}', grams))

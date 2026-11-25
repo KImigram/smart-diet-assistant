@@ -14,6 +14,7 @@ from dao.meal_dao import MealDAO
 from dao.food_dao import FoodDAO
 from dao.chat_dao import ChatDAO
 from services.nutrition_service import NutritionService
+from services.portion_units import PORTION_WEIGHT
 
 
 class RAGService:
@@ -42,8 +43,6 @@ class RAGService:
 
     @staticmethod
     def needs_recipe_search(question: str) -> bool:
-        from services.structured_nutrition import GRAMS
-
         clauses = [part.strip() for part in RAGService._CLAUSE_BOUNDARY.split(question)
                    if part.strip()]
         if not clauses or RAGService._RECIPE_CUE.search(question):
@@ -53,7 +52,7 @@ class RAGService:
             RAGService._PROFILE_CUE.search(part)
             or (
                 RAGService._NUTRITION_CUE.search(part)
-                and (RAGService._RECORD_CUE.search(part) or GRAMS.search(part))
+                and (RAGService._RECORD_CUE.search(part) or PORTION_WEIGHT.search(part))
             )
             for part in clauses
         )
