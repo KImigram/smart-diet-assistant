@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'backend'))
 from rag.query_rewriter import rewrite_question
 
@@ -88,3 +90,21 @@ def test_query_plan_analyzes_single_turn_and_rejects_changed_portion():
     assert [f.grams for f in analyze_question(question, [], Model()).foods] == [150, 150]
     payload['foods'][0]['grams'] = 100
     assert analyze_question(question, [], Model()) is None
+
+
+@pytest.mark.parametrize('portion,proposed,verified', [
+    ('半斤', 250, 250), ('半斤', 500, None),
+    ('1磅', 453.6, 453.59237), ('1磅', 500, None),
+    ('1oz', 28.35, 28.349523125), ('1两', 50.04, None),
+])
+def test_query_plan_verifies_converted_portion(portion, proposed, verified):
+    from rag.query_plan import analyze_question
+
+    question = f'{portion}牛油果多少大卡？'
+    payload = dict(query=question, meal_query=None, recipe_query=None,
+                   foods=[{'name': '牛油果', 'grams': proposed}],
+                   sum_foods=False, profile=False, weight=False, clarification=None)
+    model = SimpleNamespace(invoke=lambda messages: SimpleNamespace(content=json.dumps(payload)))
+
+    plan = analyze_question(question, [], model)
+    assert (plan.foods[0].grams if plan else None) == verified

@@ -96,3 +96,29 @@ def test_food_matching_prefers_long_name_and_supports_before_after_portions(monk
     assert [row['requested_portion_g'] for row in result]==[60,150]
     result = food_knowledge('下午想吃点草莓，再烤个巴斯克。150克草莓多少大卡？')
     assert len(result)==1 and result[0]['requested_portion_g']==150
+    result = food_knowledge('半斤草莓热量多少？')
+    assert result[0]['requested_portion_g'] == 250
+    assert result[0]['requested_nutrition']['calorie'] == 100
+
+
+@pytest.mark.parametrize('text,expected', [
+    ('半斤', '250'), ('两斤', '1000'), ('三两', '150'), ('2两', '100'),
+    ('0.5 公斤', '500'), ('0.25千克', '250'), ('.5 KG', '500'),
+    ('150g草莓', '150'), ('150毫克', '0.15'), ('150mg', '0.15'),
+    ('1磅', '453.59237'), ('2lbs', '907.18474'), ('1oz', '28.349523125'),
+    ('1盎司', '28.349523125'),
+])
+def test_portion_weights_convert_to_grams(text, expected):
+    from decimal import Decimal
+    from services.portion_units import PORTION_WEIGHT, weight_in_grams
+
+    match = PORTION_WEIGHT.search(text)
+    assert match is not None
+    assert weight_in_grams(match) == Decimal(expected)
+
+
+@pytest.mark.parametrize('text', ['150ml', '150GB', '2kgf', '10克拉', '-30g', '一两次', '二十斤'])
+def test_portion_weights_do_not_match_unrelated_or_partial_units(text):
+    from services.portion_units import PORTION_WEIGHT
+
+    assert PORTION_WEIGHT.search(text) is None

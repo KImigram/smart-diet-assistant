@@ -1,0 +1,11 @@
+[
+ {"id":"mix01","question":"晚上想炒个扬州炒饭，一份得留多少冷饭？我{date}记下来的那些吃的，一共多少大卡？","kind":"meals","offset":0,"metrics":["calorie"],"evidence":[{"source":"staple/扬州炒饭.md","section":"计算","quote":"冷饭 500g"}],"recipe_numbers":[[500,"g"]]},
+ {"id":"mix02","question":"我{date}午饭吃的那些加起来有多少蛋白质？晚上想喝紫菜蛋花汤，干紫菜下锅前得泡多久？","kind":"meals","offset":0,"meal":"午餐","metrics":["protein"],"evidence":[{"source":"soup/紫菜蛋花汤.md","section":"操作","quote":"干紫菜用清水泡 15 分钟"}],"recipe_numbers":[[15,"min"]]},
+ {"id":"mix03","question":"我{date}那天记下来的东西一共多少大卡？对了，炒酸辣土豆丝之前，切好的丝要焯几秒？","kind":"meals","offset":1,"metrics":["calorie"],"evidence":[{"source":"vegetable/酸辣土豆丝.md","section":"操作","quote":"对土豆丝焯水 10 秒"}],"recipe_numbers":[[10,"s"]]},
+ {"id":"mix04","question":"早饭想搭点牛油果和美式炒蛋。60克牛油果大概多少大卡？炒蛋的蛋液加盐打起泡以后，要放多久再下锅？","kind":"food","food":"牛油果（生）","grams":60,"metrics":["calorie"],"evidence":[{"source":"breakfast/美式炒蛋.md","section":"操作","quote":"静置 15 分钟"}],"recipe_numbers":[[15,"min"]]},
+ {"id":"mix05","question":"下午想吃点草莓，再烤个巴斯克。150克草莓大概多少大卡？烤箱做的巴斯克芝士蛋糕要放多少淡奶油？","kind":"food","food":"草莓（生）","grams":150,"metrics":["calorie"],"evidence":[{"source":"dessert/烤箱版巴斯克芝士蛋糕.md","section":"必备原料和工具","quote":"淡奶油：120g"}],"recipe_numbers":[[120,"g"]]},
+ {"id":"mix06","user":"empty","question":"我{date}那天有记过吃的东西吗，有的话一共多少大卡？我还在做酸奶意式奶冻，奶油得凉到多少度再加酸奶？","kind":"no_records","offset":0,"term_groups":[["没有记录","未登记","没有登记","无记录","暂无","没有饮食记录","未记录"]],"evidence":[{"source":"dessert/酸奶意式奶冻.md","section":"操作","quote":"淡奶油降温至 40 度"}],"recipe_numbers":[[40,"C"]]},
+ {"id":"mix07","question":"我{date}午饭吃的东西一共多少大卡？晚上想做鸡蛋羹，微波炉那种一份要兑多少水？要是用蒸箱，多少度蒸几分钟？","kind":"meals","offset":0,"meal":"午餐","metrics":["calorie"],"evidence":[{"source":"vegetable/微波炉鸡蛋羹.md","section":"计算","quote":"水 200ml * 份数"},{"source":"vegetable/蒸箱鸡蛋羹.md","section":"操作","quote":"100摄氏度**蒸 **10 分钟"}],"recipe_numbers":[[200,"ml"],[100,"C"],[10,"min"]]},
+ {"id":"mix08","question":"我{date}那天吃的东西一共多少大卡、多少蛋白质？还有，手工包水饺，和好面以后第一次要醒多久？","kind":"meals","offset":2,"metrics":["calorie","protein"],"evidence":[{"source":"staple/手工水饺.md","section":"操作","quote":"使面团醒发约 45 分钟"}],"recipe_numbers":[[45,"min"]]},
+ {"id":"mix09","question":"我{date}那天记下来的吃的加起来多少大卡？晚上想炖排骨山药玉米汤，山药想留成块，排骨先炖多久再放山药？","kind":"meals","offset":0,"metrics":["calorie"],"evidence":[{"source":"soup/排骨山药玉米汤.md","section":"附加内容","quote":"排骨炖煮 20 分钟后再放入山药"}],"recipe_numbers":[[20,"min"]]}
+]
