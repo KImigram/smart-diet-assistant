@@ -1,0 +1,14 @@
+[
+  {"id":"oral01","question":"前儿午饭那顿热量给我搂一眼呗。","history":[],"expected":{"meal":{"offset":2,"meal_types":["午餐"]},"foods":[]}},
+  {"id":"oral02","question":"不是午饭哈，就早上那顿蛋白质多少？","history":[{"role":"user","content":"昨天我想问下吃的。"},{"role":"assistant","content":"你想查昨天午餐吗？"}],"expected":{"meal":{"offset":1,"meal_types":["早餐"],"terms":[["蛋白"]]},"foods":[]}},
+  {"id":"oral03","question":"那就它来80克吧，大卡呢？","history":[{"role":"user","content":"就聊草莓，想估一下热量。"},{"role":"assistant","content":"好，准备吃多少？"}],"expected":{"foods":[["草莓",80]]}},
+  {"id":"oral04","question":"俩都来150克，合到一块儿多少大卡啊？","history":[{"role":"user","content":"我盘里放草莓和牛油果。"},{"role":"assistant","content":"需要算营养的话可以告诉我各吃多少。"}],"expected":{"foods":[["草莓",150],["牛油果",150]],"sum_foods":true}},
+  {"id":"oral05","question":"草莓牛油果我一共称了150克，热量给个数呗。","history":[],"expected":{"clarify":true,"clarify_terms":[["各","分别","比例","份量","重量"]]}},
+  {"id":"oral06","question":"它150克顶多少大卡？","history":[{"role":"user","content":"我在草莓和牛油果里挑一个。"},{"role":"assistant","content":"你打算吃哪个？"}],"expected":{"clarify":true,"clarify_terms":[["草莓","牛油果","哪","指"]]}},
+  {"id":"oral07","question":"早上那顿吃了多少大卡？还有虾先别管，换蒸箱鸡蛋羹，啥温度得蒸几分钟？","history":[{"role":"user","content":"今天想回看吃的，还想做蒜蓉虾。"},{"role":"assistant","content":"你要查哪一餐？"}],"expected":{"meal":{"offset":0,"meal_types":["早餐"]},"recipe":[["蒸箱鸡蛋羹","蒸箱","蒸汽烤箱"],["温度","多少度"],["多久","几分钟","多长","时间"]],"exclude_recipe":["蒜蓉虾"],"foods":[]}},
+  {"id":"oral08","question":"那玩意儿冰水里还得待几分钟？","history":[{"role":"user","content":"我做温泉蛋，准备捞出来。"},{"role":"assistant","content":"接下来是冷却步骤。"}],"expected":{"recipe":[["温泉蛋"],["冰水"],["几分钟","多久","时间","几分"]],"foods":[]}},
+  {"id":"oral09","question":"牛油果要半斤的话，算下来几大卡？","history":[],"expected":{"foods":[["牛油果",250]]}},
+  {"id":"oral10","question":"草莓我本来想吃200克，算了减到120克，多少热量？","history":[],"expected":{"foods":[["草莓",120]]}},
+  {"id":"oral11","question":"今天的午饭别掺进来，就昨儿那顿午饭我吃了多少大卡？","history":[],"expected":{"meal":{"offset":1,"meal_types":["午餐"]},"foods":[]}},
+  {"id":"oral12","question":"这两样我分别称了60克和150克，加一块儿多少大卡？","history":[{"role":"user","content":"我手头有牛油果和草莓，按这个顺序。"},{"role":"assistant","content":"好，你称一下这两样各多少克。"}],"expected":{"foods":[["牛油果",60],["草莓",150]],"sum_foods":true}}
+]
